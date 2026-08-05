@@ -1,0 +1,504 @@
+FORGEWHEEL — Development Documentation
+
+Developer: Pamtok Samdaloh Tok
+Engine: Unity 6.3 LTS
+Target Platform: PC (Steam) / WebGL (portfolio piece)
+Genre: Arcade Racing
+Status: Build 1 and 2 Complete
+Repository: www.github.com/pamttok
+
+This document serves as a living engineering record of technical problems encountered, solutions implemented, and architectural decisions made during the development of FORGEWHEEL. It is intended to demonstrate professional problem-solving discipline, technical depth, and the kind of iterative decision-making expected in a studio environment.
+
+TABLE OF CONTENT:
+Project Overview:
+Vehicle Data
+Technical Problems & Solutions
+Architectural Decisions
+What I Learned
+Known Issues & Future Work
+Development Timeline Note
+
+1. Project Overview
+
+FORGEWHEEL is a single-player arcade racing game built in Unity 6.3 LTS, shipped as two distinct builds targeting different aspects of vehicle physics implementation.
+
+Build 1 — FORGEWHEEL Racing:
+Features a custom WheelCollider-based vehicle physics implementation written from scratch. The player drives a 2005 BMW M3 GTR against a 2012 Lexus LFA AI opponent on a flat-surface circuit. WheelCollider parameters are tuned to real-world vehicle specifications including mass, suspension rates, brake balance, tyre friction coefficients, and aerodynamic data. This build covers a complete race gameplay loop, lap timing, minimap, rear-view mirror, speedometer, three camera views, and basic AI opponent navigation. Development was completed under a hard deadline due to an upcoming SIWES industrial placement and the requirement to return the development laptop to its owner. Some known bugs remain unresolved as a result and are documented transparently in Section 6.
+
+Build 2 — FORGEWHEEL Score Attack:
+Features a professional vehicle physics asset from the Unity Asset Store configured using real-world vehicle data. Score attack game mode where the player drives through collectible targets placed around the track, accumulating points. This build demonstrates the ability to work within existing professional physics middleware and configure it correctly using real manufacturer specifications — a workflow directly analogous to how professional racing game studios use middleware physics solutions alongside custom gameplay systems. Documented separately.
+
+The project is being built with a future Steam release in mind. The long-term vision for FORGEWHEEL is a grounded engineering simulation where the player is a professional vehicle engineer whose tuning and forging decisions feed directly into real-time physics simulation — a workshop-to-track loop where every engineering decision has measurable physical consequences. All current architectural decisions — particularly the CarDataSO ScriptableObject pattern — are designed to support this future direction without requiring structural refactoring.
+
+2. Vehicle Data — Real World Specifications
+
+BMW M3 GTR 2005 (Player Vehicle — Build 1)
+
+The BMW M3 GTR is a GT racing variant of the E46 M3, built specifically for endurance racing including the American Le Mans Series. Its suspension and tyre setup reflect endurance racing priorities — stability, consistency, and mechanical grip over peak lateral performance.
+
+float mass              = 1400f;
+float horsePower        = 500f;
+float maxRPM            = 8000f;
+int   gears             = 6;
+float dragCoefficient   = 0.32f;
+float frontWeightBias   = 0.47f;s
+float tyreFrictionPeak  = 1.45f;
+float optimalSlipAngle  = 7.5f;
+float brakeBalance      = 0.60f;
+float topSpeed          = 80.0f;   
+float frontSpringRate   = 45000f; 
+float rearSpringRate    = 40000f;
+float suspensionTravel  = 0.06f;   
+float brakeTorqueMax    = 9500f;     
+Lexus LFA (AI Opponent Vehicle — Build 1)
+
+The Lexus LFA is a low-volume supercar built around a naturally aspirated 4.8L V10 engine. Its rear-heavy weight distribution, high-revving engine character, and stiff suspension geometry produce sharper, more nervous handling compared to the M3 GTR — making it a distinctly different physics challenge as an AI opponent.
+
+float mass              = 1480f;     
+float horsePower        = 553f;      
+float maxRPM            = 9000f;
+int   gears             = 6;
+float dragCoefficient   = 0.326f;
+float frontWeightBias   = 0.48f;    
+float tyreFrictionPeak  = 1.45f;
+float optimalSlipAngle  = 7.0f;      
+float brakeBalance      = 0.58f;
+float topSpeed          = 97.2f;     
+float frontSpringRate   = 50000f;    
+float rearSpringRate    = 45000f;
+float suspensionTravel  = 0.055f;    
+float brakeTorqueMax    = 10000f;   
+
+Design intent: The M3 GTR and LFA are tuned to feel genuinely different from each other. The M3 GTR should feel planted and forgiving at the limit — consistent with its endurance racing character. The LFA should feel sharper, higher-revving, and more responsive to steering input — consistent with its supercar character. This difference is expressed through differentiated WheelCollider friction curves, spring rates, brake balance values, and motor torque curves rather than visual differentiation alone.
+
+3. Technical Problems & Solutions
+
+Problem 1 — Importing Textured Car Models from Sketchfab
+
+Category: Asset Pipeline
+Severity: Medium
+
+Problem:
+Downloaded car models from Sketchfab arrived with textures either missing entirely, disconnected from their materials, or using incompatible texture encoding for Unity's URP pipeline. Albedo, normal, and metallic maps were often packed differently to Unity's expected channel layout.
+
+Solution:
+Manually re-assigned texture maps inside Unity's material inspector for each mesh. For models using a metallic-roughness workflow (common in glTF exports from Sketchfab), the roughness channel had to be manually inverted and placed into the smoothness channel of Unity's Standard (Lit) shader. Normal maps required the texture import setting to be changed from Default to Normal Map to prevent visual artefacts on lighting.
+
+Why This Decision:
+Re-assigning textures manually was more reliable than attempting an automated conversion, which often produced incorrect results on complex multi-material meshes. This approach also gave full control over material quality per asset.
+
+Lesson:
+Always inspect Sketchfab model exports before importing. FBX exports retain more material data than glTF in Unity's URP pipeline. For a production pipeline, standardising on a single export format and writing an import post-processor script would eliminate this manual step entirely.
+
+Problem 2 — Painting Asphalt Texture on Terrain
+
+Category: Environment Art / Terrain
+Severity: Low–Medium
+
+Problem:
+Unity's Terrain system requires textures to be assigned as Terrain Layers before they can be painted. Attempting to paint with a standard texture directly caused no visible change. Additionally, the asphalt texture tiled visibly at a distance due to incorrect tiling scale settings.
+
+Solution:
+Created a TerrainLayer asset for the asphalt texture, set appropriate tiling size values (larger tile scale reduces visible repetition at distance), and used the Terrain Paint Texture tool correctly. A secondary overlay layer at a different tiling frequency was added to break up obvious repetition.
+
+Lesson:
+Terrain workflows in Unity are distinct from standard mesh-material workflows. Understanding TerrainLayer as a separate asset type is fundamental for any open-world or circuit game using Unity's terrain system.
+
+Problem 3 — Render Pipeline Converter Issues with Asset Store Textures
+
+Category: Asset Pipeline / URP
+Severity: Medium–High
+
+Problem:
+Several assets downloaded from the Unity Asset Store were authored for the Built-in Render Pipeline. When loaded into a URP project, materials appeared pink (missing shader) or visually incorrect. Running the Render Pipeline Converter did not fully resolve all materials, particularly those using custom Built-in shaders.
+
+Solution:
+Used the Render Pipeline Converter (Window → Rendering → Render Pipeline Converter) for assets that had straightforward Standard shader materials. For assets with custom shaders that the converter could not handle, manually replaced shaders with their URP equivalents (Universal Render Pipeline/Lit, Universal Render Pipeline/Simple Lit). In cases where no URP equivalent existed, replaced with a best-fit URP shader and re-assigned texture channels.
+
+Why This Decision:
+Manually replacing shaders preserves the visual intent of the original asset while ensuring compatibility. Attempting to patch custom Built-in shaders would have required source shader access and was out of scope.
+
+Lesson:
+Before purchasing any Unity Asset Store asset for a URP project, verify it explicitly states URP support. Always test a single asset import before purchasing a full pack.
+
+Problem 4 — Pre-Planned Custom Raycast Physics Abandoned in Favour of WheelCollider for NGO Compatibility
+
+Category: Vehicle Physics / Networking Architecture
+Severity: High
+
+Problem:
+The original pre-planned vehicle physics implementation was a fully custom raycast suspension and friction model — raycasts per wheel, manual spring compression, and direct Rigidbody.AddForceAtPosition calls for lateral and longitudinal friction. This was the intended approach from the start of the project, chosen for the fine-grained control it offers over suspension feel and tyre friction curves.
+
+During development, the NGO multiplayer requirement was assessed more carefully. Custom raycast physics running independently on each client is extremely difficult to synchronise deterministically — each client's physics tick produces slightly different float results that diverge rapidly without a rollback or lockstep model. Implementing deterministic rollback netcode for a fully custom physics model is a multi-month engineering effort well beyond the scope of a solo project. The development machine's limited hardware also made local multiplayer testing slow to iterate on, which would have compounded the problem significantly.
+
+Decision Made:
+Switched the primary vehicle physics model to Unity's WheelCollider component (backed by PhysX) before the custom raycast implementation was finalised. The custom raycast work was retained as a reference and studied thoroughly — friction curve behaviour, slip angle calculation, and suspension dynamics derived from that study directly informed the tuning of WheelCollider parameters in the final implementation.
+
+Why This Decision:
+WheelCollider + PhysX produces consistent physics behaviour across machines because PhysX determinism is managed at Unity's engine layer rather than in custom code. It integrates more cleanly with NGO's NetworkRigidbody component. For a solo developer with a Steam release and future multiplayer on the roadmap, switching early eliminated an entire category of networking problems before they were ever written into the codebase. The short-term loss of physics control was the correct trade against the long-term multiplayer architecture benefit.
+
+Lesson:
+Pre-planned technical approaches must be re-evaluated against the full project roadmap before implementation is committed to, not after. Recognising that a technically appealing approach (custom raycast) would create downstream problems (NGO sync complexity) and changing course early is a mark of engineering maturity. This is a genuine tradeoff studios make — Codemasters' EGO engine uses PhysX-backed wheel simulation precisely because deterministic physics across network clients is non-trivial to achieve with fully custom solvers.
+
+Problem 5 — Rear-View Mirror Showing Reversed Left/Right
+
+Category: Rendering / Camera
+Severity: Low–Medium
+
+Problem:
+The rear-view mirror camera showed objects on the correct side vertically but with left and right inverted — objects physically to the right of the car appeared on the left side of the mirror, and vice versa.
+
+Solution:
+The mirror camera's projection matrix was negated on the X axis
+
+Why This Decision:
+Negating the projection matrix is the standard technique for mirror cameras in real-time rendering. It is used in commercial racing games including those built on Codemasters' EGO engine. No gameplay logic needs to change — the fix is purely at the rendering layer.
+
+Lesson:
+Mirrors in real-time rendering are not automatic. A mirror camera is simply a reflected camera, and correctly simulating the horizontal flip is a deliberate rendering step, not something Unity handles by default.
+
+Problem 6 — Self-Reversing Car and Handbrake Locking Acceleration
+
+Category: Vehicle Physics / Input
+Severity: High
+
+Problem:
+Two separate but related bugs appeared when switching between drive types (FWD, RWD, 4WD):
+
+Bug A — Self-reversing on RWD:
+When set to Rear Wheel Drive and pressing S (footbrake/reverse), the car would begin moving erratically by itself. The root cause was that the braking/reverse loop applied motorTorque to all four wheels regardless of drive type. In RWD mode, reverse torque was incorrectly applied to the front (non-driven) wheels simultaneously, creating conflicting forces — the front wheels fought the rear wheels and produced oscillating self-propulsion.
+
+Bug B — Handbrake permanently locking wheels:
+Pressing Space (handbrake) applied float.MaxValue brake torque to the rear wheels. When Space was released, no code path ever reset brakeTorque back to zero. The wheels remained permanently locked, making it impossible to accelerate again until exiting and re-entering Play mode. The bug existed because the handbrake release branch had inverted flag logic that prevented the reset from ever executing.
+
+Solution:
+Refactored Drive() to track which wheel indices are actually driven for the current drive type, and restricted reverse torque exclusively to those wheels. Added an explicit else branch to the handbrake block that resets brakeTorque to 0f on release. m_MaxHandbrakeTorque was also changed from float.MaxValue to a physically grounded value:
+
+c#
+// Reverse torque only applied to driven wheels
+if (isDriven)
+    m_WheelColliders[i].motorTorque = -m_ReverseTorque * footbrake;
+
+// Handbrake release explicitly clears brakeTorque
+float hbTorque = handbrake * m_MaxHandbrakeTorque;
+m_WheelColliders[2].brakeTorque = hbTorque;
+m_WheelColliders[3].brakeTorque = hbTorque;
+// When handbrake is 0: 0 * m_MaxHandbrakeTorque = 0
+// Clears automatically without needing an if/else
+
+// m_MaxHandbrakeTorque corrected from float.MaxValue
+m_MaxHandbrakeTorque = 5000f;  // Nm — strong enough to lock rear wheels
+
+Lesson:
+Drive type switching requires careful separation of which wheels receive which forces. The handbrake bug is a classic state-management failure — always ensure every state has an explicit exit condition, not just an entry condition.
+
+Problem 7 — Best Lap Timer UI Scaling Incorrectly
+
+Category: UI / Canvas
+Severity: Low
+
+Problem:
+The best lap time display was not scaling correctly across different screen resolutions. UI elements appeared too large on some resolutions and too small on others, breaking the layout.
+
+Solution:
+The Canvas Scaler component on the UI Canvas was set to Scale With Screen Size with a reference resolution of 1920 × 1080. This is the standard approach for resolution-independent UI in Unity and ensures all UI elements scale proportionally regardless of the player's display resolution.
+
+Lesson:
+Always configure the Canvas Scaler to Scale With Screen Size with a defined reference resolution at the start of UI development, not as an afterthought. Retrofitting this later requires manually verifying every UI element's anchors and layout.
+
+Problem 8 — WheelCollider Causing Car to Jump at Runtime Start
+
+Category: Vehicle Physics / PhysX
+Severity: High
+
+Problem:
+Immediately upon entering Play mode, the car would violently jump upward before settling. This is a known PhysX/WheelCollider behaviour caused by the suspension spring instantaneously decompressing from its rest position in the first physics frame.
+
+Investigation:
+Initial debugging focused on WheelCollider and Rigidbody configuration — suspension distance, spring values, centre of mass offset. All values appeared correct in isolation. The MeshCollider on the car body was identified as a potential cause and removed, replacing it with a BoxCollider. The launch behaviour persisted.
+
+Investigation was then broadened to the track asset itself. By replacing the downloaded track asset with a Unity primitive Plane, the car settled correctly onto the plane surface with no upward launch. This isolated the variable definitively.
+
+Root Cause:
+The downloaded track asset from the Unity Asset Store had no collider component. The asset was visual only — a mesh with no physics geometry attached. The WheelColliders were extending to their maximum suspension distance searching for ground contact that did not exist. The suspension extension force combined with residual Rigidbody initialisation forces produced the observed upward launch. Additionally, spring force values were too high relative to vehicle mass, amplifying the first-frame impulse.
+
+Solution:
+Added a MeshCollider component to the track GameObject. Reduced spring values to be proportional to rigidbody.mass × 9.81 / wheelCount. Added a downward centerOfMass offset to stabilise resting orientation. Reduced suspensionDistance to a physically realistic value for the car's scale:
+
+c#
+// Spring force proportional to vehicle mass
+float targetSpringRate = rigidbody.mass * 9.81f / 4f;  // 4 wheels
+
+// Centre of mass offset — lowered for stability
+rigidbody.centerOfMass = new Vector3(0f, -0.5f, 0f);
+
+// Suspension distance — realistic for road/race car
+wheelCollider.suspensionDistance = 0.1f;  // 10cm travel
+
+Lesson:
+Asset Store assets are not guaranteed to include physics components. Any downloaded environment asset must be verified for collider presence before assuming physics will work correctly. This is now the first check performed when importing any environment asset.
+
+Problem 9 — Speedometer Displaying Incorrect or Uncapped Speed
+
+Category: UI / Vehicle Physics
+Severity: Medium
+
+Problem:
+The speedometer needle was either exceeding its maximum rotation or displaying values inconsistent with the car's actual speed. The display was also inconsistent between different cars.
+
+Solution:
+Three fixes were required in combination. The speedometer's maxSpeed reference was matched exactly to the CarController's m_Topspeed value (80 KPH). The speed unit calculation was corrected — Rigidbody.linearVelocity.magnitude returns metres per second, requiring multiplication by 3.6f for KPH not 2.23693629f (MPH). The CurrentSpeed property was updated to reflect the correct unit consistently:
+
+c#
+// Correct KPH conversion
+public float CurrentSpeed 
+{ 
+    get { return m_Rigidbody.linearVelocity.magnitude * 3.6f; } 
+}
+
+Lesson:
+Unit consistency is a fundamental engineering discipline. Pick one canonical internal representation and convert only at the display layer. Mixing conversion multipliers across systems creates subtle bugs that are difficult to trace.
+
+Problem 10 — Steering Not Responding to Keyboard Input
+
+Category: Legacy Input System
+Severity: Medium
+
+Problem:
+Keyboard left and right arrow key steering produced no response despite the Legacy Input System showing the keys bound correctly.
+
+Root Cause:
+The Steer action in the Legacy Input System was configured with Control Type set to Vector2.Reading the action with ReadValue<Vector2>().x produced zero for keyboard input because the float-returning composite was not being correctly interpreted as a Vector2.
+
+Problem 11 — High Speed Vehicle Clipping Through Track Geometry
+
+Category: Vehicle Physics / PhysX Collision Detection
+Severity: High
+
+Problem:
+At speeds above approximately 150 km/h the vehicle would occasionally clip through the race track surface entirely, falling through the geometry into the void below.
+
+Root Cause:
+Unity's default Discrete collision detection checks for collisions at fixed physics intervals. At high velocities a Rigidbody moves far enough between consecutive physics frames that the collision check misses the geometry entirely — the vehicle effectively passes through it between frames. This phenomenon is called tunneling and is a known limitation of discrete collision detection with fast-moving objects.
+
+Solutions Applied:
+
+Solution A — Continuous Dynamic Collision Detection:
+Changed Rigidbody Collision Detection Mode from Discrete to Continuous Dynamic. This instructs PhysX to sweep the collision volume continuously between frames rather than checking at discrete intervals, detecting geometry that would otherwise be passed through.
+
+Solution B — Fixed Timestep Reduction:
+Reduced Fixed Timestep from 0.02 to 0.01 in Edit → Project Settings → Time. More frequent physics updates (100 per second instead of 50) reduce the distance the vehicle travels between collision checks, further reducing tunneling probability.
+
+Current Status:
+Tunneling is significantly reduced but not entirely eliminated at extreme speeds. Full elimination would require implementing a forward-facing predictive raycast ahead of the vehicle's travel vector each frame. This is documented as a future improvement.
+
+Lesson:
+High-speed vehicle physics requires explicit collision detection configuration beyond Unity's defaults. Continuous Dynamic detection is the correct setting for any fast-moving Rigidbody that must maintain reliable surface contact.
+
+Problem 12 — Restart Logic Failure (Vehicle and AI Not Accelerating After Restart)
+
+Category: Game State / Vehicle Physics
+Severity: High
+
+Problem:
+After triggering a race restart, both the player vehicle and the AI opponent failed to accelerate. Both cars were correctly repositioned at the starting grid but throttle input produced no movement.
+
+Initial Hypothesis (Ruled Out):
+The initial assumption was that Time.timeScale being set to 0 during the pause state was not being correctly reset to 1 on restart, leaving the physics simulation frozen.
+
+Investigation:
+This hypothesis was tested by monitoring the lap timer behaviour during and after restart. Time.deltaTime returns zero when Time.timeScale is zero — any system using Time.deltaTime to increment would be frozen. The lap timer was observed counting correctly immediately after restart, definitively ruling out Time.timeScale as the cause. A paused timeScale cannot produce a running timer.
+
+Actual Root Cause:
+The TopSpeed variable in the BMWCarController had been set to 80 km/h during a testing session and was not being explicitly reset through the restart sequence. A logic error in the speed cap evaluation caused the stationary vehicle's speed value to be incorrectly compared against the cap — the system interpreted the car as already at or exceeding the speed limit before it had moved at all, preventing motor torque from being applied.
+
+Solution:
+TopSpeed was explicitly reset within the restart sequence. All Rigidbody values and WheelCollider torque values are now zeroed explicitly on restart rather than relying on persistence from the previous session state:
+
+Lesson:
+Game state reset logic must be explicit and exhaustive. Assuming values from a previous session will be correct for a new session is a common source of difficult-to-reproduce bugs. Every restart or state transition should set all relevant values explicitly to their intended initial state.
+
+Problem 13 — Wheel Meshes Flying Around the World
+
+Category: Vehicle Physics / Hierarchy Structure
+Severity: High
+
+Problem:
+Wheel mesh GameObjects would detach visually from the car and fly to incorrect world positions during Play, appearing to orbit erratically or snap to distant locations.
+
+Root Cause:
+Two causes were identified. First, WheelCollider radius values did not match the actual tyre mesh radius. Second, and more critically, wheel mesh GameObjects were children of the WheelCollider GameObjects in the hierarchy. WheelColliders move internally during suspension simulation — their transform position is updated by PhysX as the suspension compresses and extends. Wheel meshes parented to WheelCollider GameObjects inherit this internal movement, producing the observed erratic flying behaviour.
+
+Solution:
+Separated WheelColliders and wheel meshes into sibling branches of the car hierarchy:
+
+Car Root (Rigidbody, VehicleController)
+├── CarBody (BoxCollider)
+├── WheelColliders (empty parent)
+│   ├── WC_FL  ← WheelCollider component only
+│   ├── WC_FR
+│   ├── WC_RL
+│   └── WC_RR
+└── WheelMeshes (empty parent)
+    ├── Mesh_FL  ← MeshRenderer only, no WheelCollider
+    ├── Mesh_FR
+    ├── Mesh_RL
+    └── Mesh_RR
+
+GetWorldPose() reads each WheelCollider's computed world position and applies it to the corresponding mesh transform each frame. WheelCollider radius values were corrected to match actual tyre mesh dimensions:
+
+Lesson:
+WheelCollider GameObjects must never be parents of wheel mesh GameObjects. The hierarchy separation between collision geometry and visual geometry is a fundamental WheelCollider requirement that is not documented prominently in Unity's default tutorials.
+
+4. Architectural Decisions:
+
+Decision 1 — Vehicle Physics Values in ScriptableObjects (CarDataSO)
+
+Decision:
+Separated all per-vehicle physics constants (mass, horsepower, spring rates, tyre friction, gear ratios, aerodynamic coefficients) from the BMWCarController MonoBehaviour into a CarDataSO : ScriptableObject asset.
+
+Rationale:
+Hardcoding physics values directly into a MonoBehaviour creates several problems at scale: values cannot be shared between prefab variants, they cannot be tuned without entering Prefab Edit mode, and they couple data to behaviour in a way that violates single-responsibility principles.
+
+A ScriptableObject asset allows each car to carry its own data file (e.g. BMW_M3_GTR.asset, LexusLFA_AI.asset) that can be modified, duplicated, and version-controlled independently of the controller logic.
+
+Forward compatibility:
+In the final Steam release, these assets become the player's car build configuration — a direct analogue to how Codemasters' F1 series separates car performance data from vehicle behaviour code. Each tuning decision the player makes in the workshop modifies values in the CarDataSO, which the VehicleController reads in real time. The ScriptableObject is the engineering data layer between the workshop and the track.
+
+Real-world parallel:
+This pattern mirrors how AAA studios separate vehicle configuration data from vehicle behaviour systems. EA's data-driven vehicle pipeline in the Need for Speed series and Codemasters' car setup systems in F1 both use analogous data containers to define per-car characteristics without modifying core physics code.
+
+Decision 2 — WheelCollider Over Custom Raycast
+
+Decision:
+WheelCollider was chosen as the physics foundation over a custom raycast suspension system after the custom raycast implementation was partially built and studied.
+
+Rationale:
+The primary driver was NGO multiplayer compatibility — see Problem 4. Secondary rationale: WheelCollider's PhysX-based suspension and friction model are mature and well-tested. The professional approach is to use the right tool for the job and focus expertise on configuring it correctly with real data rather than reinventing wheel contact physics from scratch. The custom raycast work informed WheelCollider tuning directly — friction curve behaviour, slip angle calculation, and suspension dynamics studied during the custom implementation are reflected in the final WheelCollider parameter choices.
+
+Trade-off acknowledged:
+WheelCollider's friction model is not a Pacejka implementation. A complete Pacejka Magic Formula tyre model layered on top of WheelCollider contact data would produce more accurate lateral force behaviour above 150 km/h. This is documented as a planned improvement for the Steam release version.
+
+Decision 3 — MeshCollider for AI Navigation Volumes, BoxCollider for Simple Targets
+
+Decision:
+MeshCollider was chosen for AI navigation trigger volumes along the track spline, while simple BoxCollider volumes were used for point-to-point targets.
+
+Rationale:
+MeshCollider trigger volumes that closely follow the track geometry ensure the AI registers waypoint crossings reliably regardless of approach angle or vehicle width. BoxCollider volumes used for simple fixed targets are cheaper to compute and sufficient when the target is a well-defined point in space rather than a continuous path segment.
+
+Decision 4 — Asset Store Flat Track Over Custom Oval; Simple Transform Waypoints for AI Navigation
+
+Decision:
+Selected a flat-surface track asset from the Unity Asset Store rather than building a custom oval track. Implemented AI navigation using simple follow-Transform waypoint targets (empty GameObjects placed around the track) rather than a continuous spline follower.
+
+Rationale:
+WheelCollider physics behaviour is sensitive to surface normals. On a banked oval track, the normal vectors change continuously, causing suspension spring calculations to behave inconsistently and requiring custom suspension geometry code to tune correctly. A flat track provides consistent surface normals, allowing WheelCollider suspension to behave predictably — a necessary condition when tuning per-car physics data via CarDataSO.
+
+Simple Transform waypoints were chosen over spline-based path following because they are easier to implement, debug, and iterate on at this stage. Spline-based navigation with proper racing line geometry remains on the roadmap.
+
+Observation noted:
+WheelCollider-based physics produces natural understeer characteristics, while the custom raycast model produces oversteer. This aligns with known PhysX WheelCollider behaviour and is managed through steeringAssist tuning rather than replacing the physics model.
+
+Decision 5 — Camera Far Clipping Plane Set to 100,000
+
+Decision:
+The far clipping plane on all scene cameras was set to 100,000 units.
+
+Rationale:
+At Unity's default far clipping plane of 1,000 units, large track assets and background scenery at racing distances were being clipped mid-render, producing a visible auto-generating effect as the car approached distant geometry. Setting the far plane to 100,000 ensures all track and background geometry is always fully rendered regardless of camera position on the circuit.
+
+Note:
+A very large far clipping plane can cause Z-fighting on objects very close together at large world distances from the origin. This is mitigated by keeping the near clipping plane at 0.3 rather than reducing it toward zero, which would compress the depth buffer and worsen precision at distance.
+
+5. What I Learned:
+
+Unity-Specific:
+
+WheelCollider spring values must be proportional to vehicle mass — arbitrary values produce physically unstable behaviour at runtime.
+
+static fields on MonoBehaviour are shared across all instances. In a multi-car scene this silently corrupts per-car values like gear counts.
+
+GetComponent<T> is a method call and requires (). Omitting parentheses on generic method calls will not compile.
+
+GetKeyDown registers input once per press; GetKey registers every frame the key is held. Using the wrong one for a reset key causes rapid repeated invocations.
+
+PlayerPrefs keys are case-sensitive and typo-sensitive. A mismatch between save key and load key silently causes persistent data never to load.
+
+Canvas Scaler must be set to Scale With Screen Size with a reference resolution from the start of UI development — retrofitting this is time-consuming.
+
+float.ToString() without a format specifier outputs full floating-point precision, producing display strings like 9.799993 instead of 9.
+
+Asset Store assets are not guaranteed to include physics components. Any downloaded environment asset must be verified for collider presence before assuming physics will work correctly.
+
+WheelCollider GameObjects must never be parents of wheel mesh GameObjects — the hierarchy separation between collision and visual geometry is mandatory.
+
+Unity's default Discrete collision detection is insufficient for high-speed vehicles — Continuous Dynamic must be set explicitly on fast-moving Rigidbodies
+
+C# and Architecture:
+
+Separating data from behaviour (ScriptableObjects for configuration, MonoBehaviours for logic) is a foundational clean architecture principle with direct real-world application in AAA game studios.
+
+Every state needs an explicit exit condition — not just an entry condition. The handbrake bug was a direct consequence of this being overlooked.
+
+Unit consistency (m/s vs KPH vs MPH) must be decided upfront and enforced at the data layer, with conversion happening only at the display layer.
+
+Game state reset logic must be explicit and exhaustive. Never assume that values from a previous game session will be in the correct state for a new session.
+
+When debugging, rule out hypotheses with evidence before assuming. The Time.timeScale hypothesis in the restart bug was eliminated by observing the lap timer — not by guessing
+
+Vehicle Physics:
+
+Understeer vs oversteer is a property of the physics model, not just tuning. WheelCollider (PhysX) naturally understeers; custom raycast models need explicit lateral grip constraints to avoid oversteer.
+
+Drive type (FWD/RWD/4WD) fundamentally changes which wheels receive which forces. Applying reverse torque to non-driven wheels in a RWD configuration creates physically incorrect self-propulsion.
+
+Real-world vehicle data (peak torque RPM, spring rates, tyre friction coefficients, brake balance) produces more physically plausible starting points for tuning than arbitrary values, even in an arcade physics model.
+
+High-speed tunneling is a fundamental PhysX limitation requiring explicit configuration — Continuous Dynamic detection and Fixed Timestep reduction are the standard mitigations.
+
+WheelCollider radius must match actual tyre mesh dimensions precisely — a mismatch causes GetWorldPose() to return positions that do not correspond to the mesh's visual location.
+
+Game Design (as a Programmer):
+
+Rear-view mirrors in real-time rendering require an explicit horizontal flip of the camera's projection matrix. They are not automatic.
+
+Camera systems in a multi-car scene must be managed dynamically, not baked into each car prefab — duplicate cameras in the same scene fight for render priority.
+
+Score attack mode design benefits from tension mechanics — pure collection without tradeoffs lacks engagement. Decaying multipliers and risk/reward pickup placement are being evaluated for future builds.
+
+Shipping with documented known bugs and honest investigation notes is more valuable as a portfolio piece than an unshipped build waiting for perfection
+
+6. Known Issues & Future Work:
+
+Unresolved Bugs Include:
+
+High-speed tunneling (partial resolution):
+Continuous Dynamic collision detection and Fixed Timestep reduction applied. Occasional clipping persists at extreme speeds. Full resolution requires predictive forward raycast implementation ahead of the vehicle's travel vector.
+
+Restart edge case:
+Restarting immediately after a collision occasionally produces unexpected vehicle behaviour, believed to be caused by residual Rigidbody velocity not fully zeroing during the restart sequence. Full explicit state reset in the restart method is the identified solution.
+
+Planned Future Work:
+
+Feature	Status:
+NGO 2-player multiplayer implementation	Planned
+Spline-based AI path following with racing line	
+Pacejka Magic Formula tyre model on WheelCollider
+Drafting drag reduction system	Wired in CarDataSO
+Brake balance front/rear split	Field exists in CarDataSO
+Tyre heat simulation
+Per-track top speed switching
+Skid mark pooling(Currently instantiate/destroy per skid)
+LOD groups for track geometry
+Full resolution independence testing across aspect ratios
+Save per-session personal best lap times
+
+7. Development Timeline Note:
+
+ForgeWheel(Build 1 and  Build 2) was developed and completed under a firm deadline driven by a SIWES industrial placement commitment and the requirement to return the development laptop to its owner. The decision to ship with known bugs rather than delay indefinitely reflects a production-minded approach to development — a functional, honest build with transparent documentation of its limitations is more valuable as a portfolio piece than an unshipped build waiting for perfection.
+
+All known issues are documented above with full root cause investigation, demonstrating the debugging methodology applied throughout development regardless of whether resolution was achieved before the deadline.
+
+Documentation maintained by Pamtok Samdaloh Tok. Last updated: July 2026
+

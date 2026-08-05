@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a60e6927e87f4704c8dd14fd2d7fc120
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.inputs-manager/Samples~/Simple Ball Movement/PhysicMaterials/Ball.physicMaterial
+  uploadId: 910288

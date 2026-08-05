@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 33caa3cbc28ec3d4c86368301da4c63e
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.inputs-manager/Samples~/Simple Ball Movement/Scripts/Utilities.Inputs.Samples.SimpleBallMovement.asmdef
+  uploadId: 910288

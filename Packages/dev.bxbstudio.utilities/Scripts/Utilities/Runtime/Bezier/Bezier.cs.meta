@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 11afc26063c5b1348ac6dd96a1527809
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.utilities/Scripts/Utilities/Runtime/Bezier/Bezier.cs
+  uploadId: 910288

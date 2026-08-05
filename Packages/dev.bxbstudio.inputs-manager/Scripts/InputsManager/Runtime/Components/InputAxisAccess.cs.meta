@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 5c74792c24f0d0944aca675203a31cfc
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.inputs-manager/Scripts/InputsManager/Runtime/Components/InputAxisAccess.cs
+  uploadId: 910288

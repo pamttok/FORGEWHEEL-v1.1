@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 974142042a497f64c80c41678f04656e
+  - enabled: 1
+    path: Assets/Scenes/TrackSelect.unity
+    guid: 67bc7d7b9eadda2488e20b5a667b92fe
+  - enabled: 1
+    path: Assets/Scenes/Garage.unity
+    guid: 98d08901ef219a44e8d61838e0931399
+  - enabled: 1
+    path: Assets/Scenes/Information.unity
+    guid: 839cd2819214be1429c27ba74ba89cdd
+  - enabled: 1
+    path: Assets/Scenes/RaceArea.unity
+    guid: 0037cd9e622a89e4a82549f73b2393c4
+  - enabled: 1
+    path: Assets/Scenes/Credits.unity
+    guid: 6cb4266ac2c7e2f4f99233dc249440bf
+  m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
+  m_UseUCBPForAssetBundles: 0

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 9f0f1253af6bc174bba32878d7f11a6e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.utilities/Scripts/Utilities/Editor/WheelRadiusCalculatorEditor.cs
+  uploadId: 910288

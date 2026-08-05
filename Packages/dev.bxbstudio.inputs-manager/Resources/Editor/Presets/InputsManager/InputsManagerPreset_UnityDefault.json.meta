@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f04e55dee9e53d3429e28837f2ac91d7
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304216
+  packageName: 'Multiversal Vehicle Controller: Community - Car Physics Controller'
+  packageVersion: 1.4.4-beta.2
+  assetPath: Packages/dev.bxbstudio.inputs-manager/Resources/Editor/Presets/InputsManager/InputsManagerPreset_UnityDefault.json
+  uploadId: 910288
