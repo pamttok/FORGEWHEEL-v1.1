@@ -123,7 +123,7 @@ Topics include:
 * Vehicle architecture decisions
 * Lessons learned throughout development
 
-[Full Technical Development Documentation →](./FORGEWHEEL_DEVDOC.md)
+[Full Technical Development Documentation →](./FORGEWHEEL_DEV_DOC.txt)
 
 ## Current Progress
 
