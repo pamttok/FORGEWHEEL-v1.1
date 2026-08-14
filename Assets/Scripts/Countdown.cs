@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Drives the pre-race countdown sequence ("3, 2, 1, GO!") at the start of a level.
+/// Drives the pre race countdown sequence ("3, 2, 1, GO!") at the start of a level.
 /// Handles UI display, audio cues, and enabling gameplay-critical systems
 /// (car controls, lap timer) once the countdown completes.
 /// </summary>
